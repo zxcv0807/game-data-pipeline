@@ -1,7 +1,8 @@
 import os
 import requests
 import time
-import json # json 라이브러리 추가
+import json
+import boto3
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,7 +20,7 @@ def get_account_info_by_puuid(puuid):
     else:
         return None, None
 
-def get_challenger_league_and_save_json():
+def get_challenger_league_and_upload_to_s3():
     league_url = "https://kr.api.riotgames.com/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5"
     
     print("챌린저 리그 데이터 요청을 시작합니다...")
@@ -61,18 +62,37 @@ def get_challenger_league_and_save_json():
             
             time.sleep(0.1)
         
+        # S3에 업로드할 데이터가 있는지 확인
+        if not challenger_list:
+            print("수집된 데이터가 없어 S3에 업로드하지 않습니다.")
+            return
+
+        # 클라이언트 생성
+        s3_client = boto3.client('s3')
+        # S3 버킷 이름 설정
+        bucket_name = 'zxcv0807-game-data-bucket'
         # 파일 이름 설정
-        output_filename = 'challengers.json'
-        # 리스트에 쌓인 모든 데이터를 JSON 파일로 저장
-        with open(output_filename, 'w', encoding='utf-8') as f:
-            # ensure_ascii=False: 한글이 깨지지 않도록 설정
-            # indent=4: 사람이 보기 좋게 4칸 들여쓰기로 저장
-            json.dump(challenger_list, f, ensure_ascii=False, indent=4)
-        
-        print(f"\n✅ 데이터 수집 완료! 총 {len(challenger_list)}명의 데이터가 '{output_filename}' 파일에 저장되었습니다.")
+        file_key = 'raw-data/challengers/challengers.json'
+
+        try:
+            # 1. 파이썬 리스트(challenger_list)를 JSON 형식의 문자열로 변환합니다.
+            json_data = json.dumps(challenger_list, ensure_ascii=False, indent=4)
+
+            # 2. S3 버킷에 파일을 업로드합니다.
+            s3_client.put_object(
+                Bucket=bucket_name,
+                Key=file_key,
+                Body=json_data,
+                ContentType='application/json'
+            )
+
+            print(f"\n✅ 데이터 수집 및 업로드 완료! 총 {len(challenger_list)}명의 데이터가 S3 버킷 '{bucket_name}'의 '{file_key}' 경로에 저장되었습니다.")
+            
+        except Exception as e:
+            print(f"\n❌ S3 업로드 중 에러가 발생했습니다: {e}")
 
     else:
         print(f"리그 정보 요청 실패. 상태 코드: {league_response.status_code}")
 
 if __name__ == "__main__":
-    get_challenger_league_and_save_json()
+    get_challenger_league_and_upload_to_s3()
