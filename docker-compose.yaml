@@ -120,13 +120,13 @@ services:
     <<: *airflow-common
     command: api-server
     ports:
-      - "8080:8080"
+      - "8081:8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/version"]
       interval: 30s
-      timeout: 10s
+      timeout: 30s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     restart: always
     depends_on:
       <<: *airflow-common-depends-on
@@ -331,6 +331,21 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+  
+  # -- Spark 서비스를 추가 --
+  spark-master:
+    image: apache/spark:3.5.7-python3
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_HOST=spark-master
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - ./:/opt/spark/work-dir
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
 
 volumes:
   postgres-db-volume:

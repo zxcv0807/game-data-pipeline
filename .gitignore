@@ -6,3 +6,12 @@ venv/
 
 # 파이썬 캐시 파일
 __pycache__/
+
+# Airflow 로그
+logs/
+
+# Airflow 설정
+config/
+
+# Spark/Ivy 라이브러리 캐시
+.ivy2/
