@@ -335,6 +335,7 @@ services:
   # -- Spark 서비스를 추가 --
   spark-master:
     image: apache/spark:3.5.7-python3
+    user: root
     environment:
       - SPARK_MODE=master
       - SPARK_MASTER_HOST=spark-master

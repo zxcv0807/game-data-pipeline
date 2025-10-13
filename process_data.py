@@ -1,5 +1,6 @@
 import os
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
 
 # AWS 자격 증명을 환경 변수에서 가져옵니다.
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
@@ -32,13 +33,27 @@ def main():
 
         print("데이터를 성공적으로 읽었습니다!")
         
-        # 데이터의 스키마(구조)를 출력합니다.
-        print("--- 데이터 스키마 ---")
-        df.printSchema()
+        print("\n--- 데이터 가공 시작 ---")
+        processed_df = df.select(
+            col("summonerName"),
+            col("leaguePoints"),
+            col("rank"),
+            col("wins"),
+            col("losses")
+        ).withColumn(
+            "winRate",
+            col("wins") / (col("wins") + col("losses"))
+        )
+        print("데이터 가공 완료!")
 
-        # 상위 5개의 데이터를 샘플로 출력합니다.
-        print("--- 데이터 샘플 (상위 5개) ---")
-        df.show(5)
+        # --- 가공된 데이터 확인 ---
+        print("\n--- 가공된 데이터 스키마 ---")
+        processed_df.printSchema()
+
+        print("\n--- 가공된 데이터 샘플 (상위 5개) ---")
+        # 정렬 기능을 추가하여 LP가 높은 순으로 5명을 봅니다.
+        processed_df.sort(col("leaguePoints").desc()).show(5)
+
 
     except Exception as e:
         print(f"데이터 처리 중 에러가 발생했습니다: {e}")
