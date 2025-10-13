@@ -46,13 +46,17 @@ def main():
         )
         print("데이터 가공 완료!")
 
-        # --- 가공된 데이터 확인 ---
-        print("\n--- 가공된 데이터 스키마 ---")
-        processed_df.printSchema()
+        # --- 가공된 데이터 S3에 저장(Load) 단계 시작 ---
+        print("\n--- 가공된 데이터 S3에 저장 시작 ---")
 
-        print("\n--- 가공된 데이터 샘플 (상위 5개) ---")
-        # 정렬 기능을 추가하여 LP가 높은 순으로 5명을 봅니다.
-        processed_df.sort(col("leaguePoints").desc()).show(5)
+        # 저장할 S3 경로 설정
+        processed_s3_path = f"s3a://{S3_BUCKET_NAME}/processed-data/challengers/"
+
+         # 데이터를 Parquet 포맷으로 S3에 저장
+        # mode("overwrite"): 만약 같은 경로에 데이터가 이미 있다면 덮어쓰기
+        processed_df.write.mode("overwrite").parquet(processed_s3_path)
+
+        print(f"가공된 데이터가 S3 경로 '{processed_s3_path}'에 Parquet 포맷으로 저장되었습니다.")
 
 
     except Exception as e:
