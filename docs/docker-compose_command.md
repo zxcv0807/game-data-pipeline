@@ -12,3 +12,6 @@ docker-compose down
 
 # 모든 데이터까지 전부 삭제
 docker-compose down --volumes
+
+# Dockerfile을 기반으로 새로운 이미지 빌드
+docker-compose build
