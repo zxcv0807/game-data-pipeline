@@ -1,6 +1,7 @@
 import os
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, avg, count
+from pyspark.sql.functions import col, avg, count, lit
+from pyspark.sql.window import Window
 
 # AWS 자격 증명
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
@@ -42,39 +43,62 @@ def main():
         )
         print("기본 데이터 가공 완료!")
 
-        # ---  데이터 집계(Aggregation) 단계 추가 ---
+        # ---  랭크별 평균 승률 및 LP 집계 ---
         print("\n--- 랭크별 평균 승률 및 LP 집계 시작 ---")
-        # 'rank' 컬럼을 기준으로 그룹화하고, 각 그룹별 평균 계산
         agg_df = processed_df.groupBy("rank").agg(
             avg("winRate").alias("averageWinRate"), # 평균 승률 계산
             avg("leaguePoints").alias("averageLeaguePoints"), # 평균 LP 계산
             count("*").alias("numberOfPlayers") # 그룹별 플레이어 수 계산
         )
-        print("데이터 집계 완료!")
+        print("랭크별 데이터 집계 완료!")
+        agg_df.show()
+        # --- 랭크 분포 계산 단계 추가 ---
+        print("\n--- 랭크 분포 계산 시작 ---")
 
-        # --- 집계된 데이터 확인 ---
-        print("\n--- 집계된 데이터 스키마 ---")
-        agg_df.printSchema()
-        print("\n--- 집계된 데이터 샘플 ---")
-        agg_df.show() # 집계 결과는 보통 많지 않으므로 전체를 보여줍니다.
+        # 1. 전체 플레이어 수 계산
+        total_players = processed_df.count()
+        print(f"전체 플레이어 수: {total_players}")
+
+        # 2. 랭크별 플레이어 수 계산
+        rank_counts_df = processed_df.groupBy("rank").agg(
+            count("*").alias("numberOfPlayers")
+        )
+
+        # 3. 각 랭크별 비율 계산
+        rank_distribution_df = rank_counts_df.withColumn(
+            "totalPlayers", lit(total_players)
+        ).withColumn(
+            "percentage",
+            (col("numberOfPlayers") / col("totalPlayers")) * 100
+        )
+
+        print("랭크 분포 계산 완료!")
+        # --- 랭크 분포 데이터 확인 ---
+        print("\n--- 랭크 분포 데이터 스키마 ---")
+        rank_distribution_df.printSchema()
+
+        print("\n--- 랭크 분포 데이터 ---")
+        rank_distribution_df.show()
 
         # --- 가공된 데이터 S3에 저장(Load) 단계 시작 ---
         print("\n--- 가공된 데이터 S3에 저장 시작 ---")
         # 저장할 S3 경로 설정
         processed_s3_path = f"s3a://{S3_BUCKET_NAME}/processed-data/challengers/"
         # 데이터를 Parquet 포맷으로 S3에 저장
-        # mode("overwrite"): 만약 같은 경로에 데이터가 이미 있다면 덮어쓰기
         processed_df.write.mode("overwrite").parquet(processed_s3_path)
         print(f"가공된 데이터가 S3 경로 '{processed_s3_path}'에 Parquet 포맷으로 저장되었습니다.")
 
-        # ---  집계된 데이터 S3 CSV 저장 단계 추가 ---
+        # ---  평균 집계 데이터 CSV 저장 ---
         agg_s3_path = f"s3a://{S3_BUCKET_NAME}/aggregated-data/challengers-summary/"
         print(f"\n--- 집계된 요약 데이터 S3 CSV 저장 시작 ({agg_s3_path}) ---")
-        # CSV로 저장할 때는 보통 하나의 파일로 합치는 것이 편리합니다.
-        # repartition(1): 데이터를 하나의 파티션으로 합침
-        # header=True: CSV 파일 첫 줄에 컬럼 이름 포함
         agg_df.repartition(1).write.mode("overwrite").option("header", True).csv(agg_s3_path)
         print("요약 데이터 CSV 저장 완료!")
+
+        # --- 랭크 분포 데이터 CSV 저장 단계 추가 ---
+        dist_s3_path = f"s3a://{S3_BUCKET_NAME}/aggregated-data/rank-distribution/"
+        print(f"\n--- 랭크 분포 데이터 S3 CSV 저장 시작 ({dist_s3_path}) ---")
+        rank_distribution_df.repartition(1).write.mode("overwrite").option("header", True).csv(dist_s3_path)
+        print("랭크 분포 데이터 CSV 저장 완료!")
 
 
     except Exception as e:
