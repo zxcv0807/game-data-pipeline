@@ -6,7 +6,13 @@ from pyspark.sql.window import Window
 # AWS 자격 증명
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-
+# --- PostgreSQL 연결 정보 추가 ---
+POSTGRES_HOST = "postgres"
+POSTGRES_PORT = "5432"
+POSTGRES_DB = "airflow"
+POSTGRES_USER = "airflow"
+POSTGRES_PASSWORD = "airflow"
+POSTGRES_DRIVER = "org.postgresql.Driver"
 # S3 버킷 정보 
 S3_BUCKET_NAME = 'zxcv0807-game-data-bucket'
 S3_FILE_KEY = 'raw-data/challengers/challengers.json'
@@ -99,6 +105,27 @@ def main():
         print(f"\n--- 랭크 분포 데이터 S3 CSV 저장 시작 ({dist_s3_path}) ---")
         rank_distribution_df.repartition(1).write.mode("overwrite").option("header", True).csv(dist_s3_path)
         print("랭크 분포 데이터 CSV 저장 완료!")
+
+        # --- 집계된 데이터를 PostgreSQL에 저장 ---
+        print("\n--- 집계된 요약 데이터 PostgreSQL 저장 시작 ---")
+
+        # PostgreSQL JDBC URL 구성
+        jdbc_url = f"jdbc:postgresql://{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+        # 저장할 테이블 이름
+        table_name = "challenger_summary_stats"
+
+        # 데이터프레임을 PostgreSQL 테이블에 쓰기
+        agg_df.write \
+            .format("jdbc") \
+            .option("url", jdbc_url) \
+            .option("dbtable", table_name) \
+            .option("user", POSTGRES_USER) \
+            .option("password", POSTGRES_PASSWORD) \
+            .option("driver", POSTGRES_DRIVER) \
+            .mode("overwrite") \
+            .save()
+            
+        print(f"집계된 데이터가 PostgreSQL '{POSTGRES_DB}' 데이터베이스의 '{table_name}' 테이블에 저장되었습니다.")
 
 
     except Exception as e:

@@ -1,7 +1,5 @@
 from __future__ import annotations
-
 import pendulum
-
 from airflow.models.dag import DAG
 from airflow.operators.bash import BashOperator
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
@@ -22,13 +20,9 @@ with DAG(
     # 작업 2: Spark로 데이터 처리 
     process_data_task = SparkSubmitOperator(
         task_id="process_data_with_spark",
-        # 1단계에서 만든 Connection ID 사용
         conn_id="spark_default",
-        # 실행할 파이썬 스크립트 지정
         application="/opt/airflow/project/process_data.py",
-        # 터미널에서 사용했던 --packages 옵션
-        packages="org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262",
-        # 터미널에서 사용했던 --conf 옵션
+        packages="org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262,org.postgresql:postgresql:42.6.0",
         conf={"spark.jars.ivy": "/home/airflow/.ivy2"},
     )
 
