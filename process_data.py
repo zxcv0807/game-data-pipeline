@@ -14,7 +14,7 @@ POSTGRES_USER = "airflow"
 POSTGRES_PASSWORD = "airflow"
 POSTGRES_DRIVER = "org.postgresql.Driver"
 # S3 버킷 정보 
-S3_BUCKET_NAME = 'zxcv0807-game-data-bucket'
+S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'zxcv0807-game-data-bucket')
 S3_FILE_KEY = 'raw-data/challengers/challengers.json'
 
 def main():

@@ -14,3 +14,4 @@ USER airflow
 
 # Spark 버전을 3.5.7로 고정하기 위해 pyspark를 직접 설치합니다.
 RUN pip install --user pyspark==3.5.7
+RUN pip install --user boto3
