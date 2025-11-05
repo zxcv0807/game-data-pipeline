@@ -15,7 +15,7 @@ POSTGRES_PASSWORD = "airflow"
 POSTGRES_DRIVER = "org.postgresql.Driver"
 # S3 버킷 정보 
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'zxcv0807-game-data-bucket')
-S3_FILE_KEY = 'raw-data/challengers/challengers.json'
+S3_FILE_KEY = 'raw-data/league_data/league_data.json'
 
 def main():
     print("Spark 세션을 시작합니다...")
@@ -38,6 +38,7 @@ def main():
         # --- 데이터 변환(Transform) 단계 ---
         print("\n--- 데이터 가공 시작 ---")
         processed_df = df.select(
+            col("tier"),
             col("summonerName"),
             col("leaguePoints"),
             col("rank"),
@@ -51,7 +52,7 @@ def main():
 
         # ---  랭크별 평균 승률 및 LP 집계 ---
         print("\n--- 랭크별 평균 승률 및 LP 집계 시작 ---")
-        agg_df = processed_df.groupBy("rank").agg(
+        agg_df = processed_df.groupBy("tier").agg(
             avg("winRate").alias("averageWinRate"), # 평균 승률 계산
             avg("leaguePoints").alias("averageLeaguePoints"), # 평균 LP 계산
             count("*").alias("numberOfPlayers") # 그룹별 플레이어 수 계산
@@ -66,7 +67,7 @@ def main():
         print(f"전체 플레이어 수: {total_players}")
 
         # 2. 랭크별 플레이어 수 계산
-        rank_counts_df = processed_df.groupBy("rank").agg(
+        rank_counts_df = processed_df.groupBy("tier").agg(
             count("*").alias("numberOfPlayers")
         )
 
@@ -89,30 +90,29 @@ def main():
         # --- 가공된 데이터 S3에 저장(Load) 단계 시작 ---
         print("\n--- 가공된 데이터 S3에 저장 시작 ---")
         # 저장할 S3 경로 설정
-        processed_s3_path = f"s3a://{S3_BUCKET_NAME}/processed-data/challengers/"
+        processed_s3_path = f"s3a://{S3_BUCKET_NAME}/processed-data/league_data/"
         # 데이터를 Parquet 포맷으로 S3에 저장
         processed_df.write.mode("overwrite").parquet(processed_s3_path)
         print(f"가공된 데이터가 S3 경로 '{processed_s3_path}'에 Parquet 포맷으로 저장되었습니다.")
 
         # ---  평균 집계 데이터 CSV 저장 ---
-        agg_s3_path = f"s3a://{S3_BUCKET_NAME}/aggregated-data/challengers-summary/"
+        agg_s3_path = f"s3a://{S3_BUCKET_NAME}/aggregated-data/league-summary/"
         print(f"\n--- 집계된 요약 데이터 S3 CSV 저장 시작 ({agg_s3_path}) ---")
         agg_df.repartition(1).write.mode("overwrite").option("header", True).csv(agg_s3_path)
         print("요약 데이터 CSV 저장 완료!")
 
         # --- 랭크 분포 데이터 CSV 저장 단계 추가 ---
-        dist_s3_path = f"s3a://{S3_BUCKET_NAME}/aggregated-data/rank-distribution/"
+        dist_s3_path = f"s3a://{S3_BUCKET_NAME}/aggregated-data/league-distribution/"
         print(f"\n--- 랭크 분포 데이터 S3 CSV 저장 시작 ({dist_s3_path}) ---")
         rank_distribution_df.repartition(1).write.mode("overwrite").option("header", True).csv(dist_s3_path)
         print("랭크 분포 데이터 CSV 저장 완료!")
 
         # --- 집계된 데이터를 PostgreSQL에 저장 ---
         print("\n--- 집계된 요약 데이터 PostgreSQL 저장 시작 ---")
-
         # PostgreSQL JDBC URL 구성
         jdbc_url = f"jdbc:postgresql://{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
         # 저장할 테이블 이름
-        table_name = "challenger_summary_stats"
+        table_name = "league_summary_stats"
 
         # 데이터프레임을 PostgreSQL 테이블에 쓰기
         agg_df.write \

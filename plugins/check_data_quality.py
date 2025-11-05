@@ -3,7 +3,7 @@ import json
 import os
 
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'zxcv0807-game-data-bucket')
-S3_FILE_KEY = 'raw-data/challengers/challengers.json'
+S3_FILE_KEY = 'raw-data/league_data/league_data.json'
 
 def check_data_quality():
     """
